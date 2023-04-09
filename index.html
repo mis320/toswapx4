@@ -71,10 +71,10 @@
         value=value.replace(/[^A-Za-z0-9]/g,'')
         "></textarea></div>
     <div class="prop1" id="prop1">(授权完这里会有提示)当前执行了:.......</div><br>
-    <div><a href="#" class="myButton" onclick="approveWebDao()">授权代币</a></div>
+    <div><a href="#" class="myButton" onclick="approveWebDao()">授权WebDao</a></div>
     <div><a href="#" class="myButton" onclick="approveUSDT()">授权USDT</a></div>
-    <button class="myButton" id="allbuy" onclick="execute()">执行</button>
-
+    <button class="myButton" id="allbuy" onclick="execute(0)">执行(USDT->TOKEN)</button>
+    <button class="myButton" id="allbuy" onclick="execute(1)">执行(USDT->WBNB->TOKEN)</button>
 
     <p>步骤 1.放私钥 2.授权2种代币,3.等待授权成功然后执行</p>
     <p>提示:执行过程中也能动态修改参数</p>
@@ -110,8 +110,9 @@
         "https://binance.nodereal.io",
         "https://bscrpc.com",
         "https://bsc.blockpi.network/v1/rpc/public",]
-    
+
     const USDT_TOKEN = '0x55d398326f99059ff775485246999027b3197955'
+    const WBNB_TOKEN = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'
     const PancakeSwap_TOKEN = '0x10ed43c718714eb63d5aa57b78b54704e256024e'
     const GET_INFO_TOKEN = '0xB00E181f2A26aEc1D646c05a3C44028Ef7591A2B'
     let web3Nodes = []
@@ -154,10 +155,17 @@
         return { PancakeSwapMethods: PancakeSwapMethods[k % y], WebDaoMethods: WebDaoMethods[k % y], USDTethods: USDTethods[k % y], getInfoMethods: getInfoMethods[k % y] }
     }
 
-    function getPath() {
-        const buy = [USDT_TOKEN, $get("token")]
-        const sell = [$get("token"), USDT_TOKEN]
-        return { buy: buy, sell: sell }
+    function getPath(index = 0) {
+        if (index = 0) {
+            const buy = [USDT_TOKEN, $get("token")]
+            const sell = [$get("token"), USDT_TOKEN]
+            return { buy: buy, sell: sell }
+        } else {
+            const buy = [USDT_TOKEN,WBNB_TOKEN, $get("token")]
+            const sell = [$get("token"),WBNB_TOKEN, USDT_TOKEN]
+            return { buy: buy, sell: sell }
+        }
+
     }
 
 
@@ -243,7 +251,7 @@
     }
 
     let stopid
-    async function execute() {
+    async function execute(exIndex) {
         clearInterval(stopid)
         web3NodesPush()
         console.log('start');
@@ -271,7 +279,7 @@
 
 
         let accountss = $get('key').split('\n');
-         stopid = setInterval(async () => {
+        stopid = setInterval(async () => {
 
             console.log("####################################################");
 
@@ -307,7 +315,7 @@
                     console.log(msg);
                     //卖
                     sendusdt = web3Nodes[0].utils.toWei(SellNumArray[exeNum % SellNumArray.length], '18')
-                    path = getPath().sell
+                    path = getPath(exIndex).sell
                     try {
                         sellN++
                         InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsIn(sendusdt, path).call()
@@ -326,7 +334,7 @@
                         sellp = -1
                     } catch (error) {
                         console.log('SWAP4');
-                        path = getPath().buy
+                        path = getPath(exIndex).buy
                         sendusdt = web3Nodes[0].utils.toWei(buyNumArray[exeNum % buyNumArray.length], '18')
                         InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsOut(sendusdt, path).call()
                         buyNUM = ethers.utils.bigNumberify(InfoBuy[1]).mul(95).div(100).toString()
@@ -346,7 +354,7 @@
                     let msg = web3Nodes[0].eth.accounts.wallet[0].address
                     console.log(msg);
                     //买
-                    path = getPath().buy
+                    path = getPath(exIndex).buy
                     sendusdt = web3Nodes[0].utils.toWei(buyNumArray[exeNum % buyNumArray.length], '18')
                     InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsOut(sendusdt, path).call()
                     buyNUM = ethers.utils.bigNumberify(InfoBuy[1]).mul(95).div(100).toString()
@@ -367,7 +375,7 @@
                     } catch (error) {
 
                         //卖
-                        path = getPath().sell
+                        path = getPath(exIndex).sell
                         sendusdt = web3Nodes[0].utils.toWei(SellNumArray[exeNum % SellNumArray.length], '18')
                         console.log('SWAP2');
                         InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsIn(sendusdt, path).call()

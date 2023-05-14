@@ -52,13 +52,13 @@
     <div id=""><textarea name="" id="numMax" cols="80" rows="2">99</textarea></div>
     <span>间隔(秒)</span>
     <div id=""><textarea name="" id="interval" cols="80" rows="2">60</textarea></div>
-    <span>买入(用usdt购买)</span>
+    <span>买入(USDT执行以USDT为单位 ,ETH执行以ETH为单位)</span>
     <div id=""><textarea name="" id="buynum" cols="80" rows="5">1
 6
 5
 4
 5</textarea></div>
-    <span>卖出(把代币卖了估计得到多少usdt)</span>
+    <span>卖出(把代币卖了估计得到多少(USDT执行以USDT为单位 ,ETH执行以ETH为单位))</span>
     <div id=""><textarea name="" id="sellnum" cols="80" rows="5">1
 3
 7
@@ -74,8 +74,8 @@
     <div><a href="#" class="myButton" onclick="approveWebDao()">授权token</a></div>
     <div><a href="#" class="myButton" onclick="approveUSDT()">授权USDT</a></div>
     <button class="myButton" id="allbuy" onclick="execute(0)">执行(USDT->TOKEN)</button>
-    <button class="myButton" id="allbuy" onclick="execute(1)">执行(USDT->WBNB->TOKEN)</button>
-
+    <button class="myButton" id="allbuy" onclick="execute(1)">执行(USDT->WETH->TOKEN)</button>
+    <button class="myButton" id="allbuy" onclick="ETH_Token()">执行(ETH->TOKEN)</button>
     <p>步骤 1.放私钥 2.授权2种代币,3.等待授权成功然后执行</p>
     <p>提示:执行过程中也能动态修改参数</p>
 
@@ -96,6 +96,7 @@
     const USDT_TOKEN = '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9'
     const USDT_TOKEN_Decimals = "6"
     const WBNB_TOKEN = '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'
+    const WETH_TOKEN_Decimals = "18"
     const PancakeSwap_TOKEN = '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506'
     const GET_INFO_TOKEN = '0xB00E181f2A26aEc1D646c05a3C44028Ef7591A2B'
     let web3Nodes = []
@@ -141,16 +142,26 @@
     }
 
     function getPath(index = 0) {
-        if (index = 0) {
+        if (index == 0) {
             const buy = [USDT_TOKEN, $get("token")]
             const sell = [$get("token"), USDT_TOKEN]
             return { buy: buy, sell: sell }
-        } else {
+        } else if (index == 1) {
             const buy = [USDT_TOKEN, WBNB_TOKEN, $get("token")]
             const sell = [$get("token"), WBNB_TOKEN, USDT_TOKEN]
             return { buy: buy, sell: sell }
+        } else {
+            const buy = [WBNB_TOKEN, $get("token")]
+            const sell = [$get("token"), WBNB_TOKEN]
+            return { buy: buy, sell: sell }
         }
 
+    }
+
+    function getETHPath(index = 0) {
+        const buy = [WBNB_TOKEN, $get("token")]
+        const sell = [$get("token"), WBNB_TOKEN]
+        return { buy: buy, sell: sell }
     }
 
 
@@ -418,9 +429,175 @@
     }
 
 
+    async function ETH_Token() {
+        let exIndex = 2
+        clearInterval(stopid)
+        web3NodesPush()
+        console.log('start');
+        let exeTRYE = 0
+        document.getElementById('allbuy').disabled = 'disabled';
+        //let numMax = parseInt($get('numMax'))
+        let exeNum = -1;
+        let sellp = -1
+        G_K++
+
+        ////////////////////////
+
+        let buyNbuyN = 0
+
+        let sellN = 0
 
 
-    function swap(params) {
+
+        ////////////////////////
+
+
+        let nonceSellMap = {}
+
+
+
+
+        let accountss = $get('key').split('\n');
+        stopid = setInterval(async () => {
+
+            console.log("####################################################");
+
+
+            let buyNumArray = []
+            let SellNumArray = []
+
+            buyNumArray = $get('buynum').split('\n')
+            SellNumArray = $get('sellnum').split('\n')
+
+            exeNum++
+            sellp++
+            console.log('buy', buyNumArray[exeNum % buyNumArray.length]);
+            console.log('sell', SellNumArray[exeNum % SellNumArray.length]);
+            console.log('exeTRYE', exeTRYE);
+            console.log('sellp', sellp);
+            console.log('exeNum', exeNum);
+            let time = Math.round(new Date().getTime() / 1000) + 36000 + ''
+            if (exeTRYE + 1 == parseInt($get('numMax'))) {
+                clearInterval(stopid)
+                document.getElementById('allbuy').disabled = false;
+            }
+            if (exeTRYE <= parseInt($get('numMax'))) {
+                G_K++
+                let sendusdt
+                let path
+                let InfoBuy
+                let buyNUM
+                if (sellp >= parseInt($get('sellP'))) {
+                    const pKey = accountss[sellN % accountss.length];
+                    accountWalletAdd(pKey)
+                    let msg = web3Nodes[0].eth.accounts.wallet[0].address
+                    console.log(msg);
+                    //卖
+                    sendusdt = web3Nodes[0].utils.toWei(SellNumArray[exeNum % SellNumArray.length], WETH_TOKEN_Decimals)
+                    path = getPath(exIndex).sell
+                    try {
+                        //swapExactTokensForTokensSupportingFeeOnTransferTokens
+                        // uint amountIn,
+                        // uint amountOutMin,
+                        // address[] calldata path,
+                        // address to,
+                        // uint deadline
+                        sellN++
+                        InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsIn(sendusdt, path).call()
+                        buyNUM = ethers.utils.bigNumberify(InfoBuy[0]).mul(95).div(100).toString()
+                        gas = await getRouter(G_K).PancakeSwapMethods.swapExactTokensForETHSupportingFeeOnTransferTokens(buyNUM, '0', path, msg, time).estimateGas({
+                            from: msg
+                        })
+                        /* let gasandmsg = await SELLestimateGas(accountss, buyNUM, path, msg, time)
+                        console.log(gasandmsg); */
+                        getRouter(G_K).PancakeSwapMethods.swapExactTokensForETHSupportingFeeOnTransferTokens(buyNUM, '0', path, msg, time).send({
+                            gas: gas,
+                            from: msg,
+                            gasPrice: gasPrice
+                        })
+                        console.log('SWAP3');
+                        sellp = -1
+                    } catch (error) {
+                        console.log('SWAP4');
+                        path = getPath(exIndex).buy
+                        sendusdt = web3Nodes[0].utils.toWei(buyNumArray[exeNum % buyNumArray.length], WETH_TOKEN_Decimals)
+                        InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsOut(sendusdt, path).call()
+                        buyNUM = ethers.utils.bigNumberify(InfoBuy[1]).mul(95).div(100).toString()
+
+                        let gas = await getRouter(G_K).PancakeSwapMethods.swapExactETHForTokens( buyNUM, path, msg, time).estimateGas({
+                            from: msg,
+                            value :sendusdt
+                        })
+                        console.log('gas', gas);
+                        getRouter(G_K).PancakeSwapMethods.swapExactETHForTokens( buyNUM, path, msg, time).send({
+                            gas: gas,
+                            from: msg,
+                            gasPrice: gasPrice,
+                            value :sendusdt
+                        })
+                    }
+                } else {
+                    const pKey = accountss[buyNbuyN % accountss.length];
+                    accountWalletAdd(pKey)
+                    let msg = web3Nodes[0].eth.accounts.wallet[0].address
+                    console.log(msg);
+                    //买
+                    path = getPath(exIndex).buy
+                    sendusdt = web3Nodes[0].utils.toWei(buyNumArray[exeNum % buyNumArray.length], WETH_TOKEN_Decimals)
+                    InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsOut(sendusdt, path).call()
+                    buyNUM = ethers.utils.bigNumberify(InfoBuy[1]).mul(95).div(100).toString()
+                    try {
+
+                        let gas = await getRouter(G_K).PancakeSwapMethods.swapExactETHForTokens( buyNUM, path, msg, time).estimateGas({
+                            from: msg,
+                            value :sendusdt
+                        })
+                        console.log('gas', gas);
+                        getRouter(G_K).PancakeSwapMethods.swapExactETHForTokens( buyNUM, path, msg, time).send({
+                            gas: gas,
+                            from: msg,
+                            gasPrice: gasPrice,
+                            value :sendusdt
+                        })
+                        console.log('SWAP1');
+
+                        buyNbuyN++
+                    } catch (error) {
+
+                        //卖
+                        path = getPath(exIndex).sell
+                        sendusdt = web3Nodes[0].utils.toWei(SellNumArray[exeNum % SellNumArray.length], WETH_TOKEN_Decimals)
+                        console.log('SWAP2');
+                        InfoBuy = await getRouter(G_K).PancakeSwapMethods.getAmountsIn(sendusdt, path).call()
+                        buyNUM = ethers.utils.bigNumberify(InfoBuy[0]).mul(90).div(100).toString()
+                        gas = await getRouter(G_K).PancakeSwapMethods.swapExactTokensForETHSupportingFeeOnTransferTokens(buyNUM, '0', path, msg, time).estimateGas({
+                            from: msg
+                        })
+
+                        /* let gasandmsg = await SELLestimateGas(accountss, buyNUM, path, msg, time)
+                        console.log(gasandmsg); */
+
+                        getRouter(G_K).PancakeSwapMethods.swapExactTokensForETHSupportingFeeOnTransferTokens(buyNUM, '0', path, msg, time).send({
+                            gas: gas,
+                            from: msg,
+                            gasPrice: gasPrice
+                        })
+                    }
+
+                }
+                console.log(InfoBuy);
+                console.log("buyNUM", buyNUM);
+                document.getElementById('prop1').innerHTML = "当前执行了:" + (exeTRYE + 1) + " 次"
+                exeTRYE++
+            }
+        }, parseInt($get('interval')) * 1000);
+
+
+
+
+
+
+
 
     }
 
